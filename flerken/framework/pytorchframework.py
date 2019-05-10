@@ -109,7 +109,6 @@ class framework(object):
         self.model_logger  = logging.getLogger('model_logger')
         self.model_logger.info('Model Version: {0}'.format(self.model_version))
         self.model_logger.info(self.model)
-        ### TRAIN ITERATION LOGGER ###
         self.__setloggers__(writemode='w',to_console=False)
 
         self.key = {'ID':self.workname,'MODEL':self.model_version,'DATE_OF_CREATION':now.strftime("%Y-%m-%d %H:%M")}
@@ -278,7 +277,7 @@ class pytorchfw(framework):
         self.key['EPOCH'] = self.epoch
         self.key['ITERATIONS'] = self.absolute_iter
         self.__update_db__()
-        self.train_writer.add_scalar('loss_epoch',self.batch_data.epoch_loss.val,self.epoch)
+        self.writer.add_scalars('loss_epoch',{'train':self.batch_data.epoch_loss.val},self.epoch)
         self.save_checkpoint()
         self.batch_data.batch_loss.reset()
 
@@ -302,13 +301,12 @@ class pytorchfw(framework):
                     loss = self.criterion(output, gt)
                     self.tensorboard_writer(loss.data.item(),output,gt,self.absolute_iter,visualization)
         self.model.train()
-
+        self.writer.add_scalars('loss_epoch', {'val': self.batch_data.epoch_loss.val}, self.epoch)
 
     def _test(self):
         self.batch_data = ptutils.timers()
         ptutils.setup_logger('test_log', os.path.join(self.workdir, 'test_log.txt'), to_console=False)
         self.test_logger = logging.getLogger('test_log')
-        #self.writer = SummaryWriter(log_dir=os.path.join(self.workdir, 'tensorboard'))
 
         batch_id = 0
         loss=0
@@ -362,8 +360,7 @@ class pytorchfw(framework):
                 self.batch_data = ptutils.timers()                 
         if self.dataparallel:
             self.model = torch.nn.DataParallel(self.model)      
-        self.train_writer = SummaryWriter(log_dir=os.path.join(self.workdir,'tensorboard','train'))
-        self.val_writer = SummaryWriter(log_dir=os.path.join(self.workdir,'tensorboard','val'))
+        self.writer = SummaryWriter(log_dir=os.path.join(self.workdir,'tensorboard'))
     def save_gradients(self,absolute_iter):
         grads = self.tracker.grad(numpy=True)
         grad_path = os.path.join(self.workdir,'gradient_tracking')
@@ -376,7 +373,7 @@ class pytorchfw(framework):
         NotImplementedError
     def tensorboard_writer(self,loss,output,gt,absolute_iter,visualization):
         if self.model.training:
-            self.train_writer.add_scalar('loss',loss,absolute_iter)
+            self.writer.add_scalar('loss',loss,absolute_iter)
     def infer(self,*inputs):
         NotImplementedError
     def hyperparameters(self):
